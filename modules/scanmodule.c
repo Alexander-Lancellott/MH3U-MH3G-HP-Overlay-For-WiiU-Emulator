@@ -13,7 +13,7 @@ static PyObject* scan_chunk(PyObject* self, PyObject* args) {
     const uint8_t* mask;
     uint64_t base_address;
     int chunk_offset;
-    uint64_t offset1 = 0x139;
+    uint64_t offset1 = 0x8A;
     uint64_t offset2 = 0x8B7;
     uint64_t offset3 = 0x4;
 
@@ -55,7 +55,7 @@ static PyObject* scan_chunk(PyObject* self, PyObject* args) {
         }
 
         if (match) {
-            uint64_t address1 = base_address + chunk_offset + i - offset1;
+            uint64_t address1 = base_address + chunk_offset + i + offset1;
             uint64_t address2 = address1 - offset2;
             uint64_t address3 = address1 + offset3;
 

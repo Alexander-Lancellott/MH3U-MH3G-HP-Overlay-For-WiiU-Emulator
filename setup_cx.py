@@ -17,7 +17,7 @@ build_exe_options = {
 
 setup(
     name="MH3U-MH3G-HP-Overlay",
-    version="1.0.0",
+    version="1.0.1",
     author="Alexander-Lancellott",
     description="MH3U-MH3G-HP-Overlay",
     options={"build_exe": build_exe_options},

@@ -303,14 +303,16 @@ def scan_aob_batched(
             name = read_int(process_handle, result[0])
             hp = read_int(process_handle, result[1], little=False)
             initial_hp = read_int(process_handle, result[2], little=False)
+            is_visible = read_int(process_handle, result[1] + 0x148, 2) == 0xE803
             monster_name = large_monsters.get(name)
-            if monster_name:
-                monster_size = int(round(read_float(process_handle, result[1] - 0x816) * 100, 2))
-                large_monster_results.append([name, hp, initial_hp, monster_size, result[1]])
-            elif show_small_monsters:
-                monster_name = small_monsters.get(name)
+            if is_visible:
                 if monster_name:
-                    small_monster_results.append([name, hp, initial_hp])
+                    monster_size = int(round(read_float(process_handle, result[1] - 0x816) * 100, 2))
+                    large_monster_results.append([name, hp, initial_hp, monster_size, result[1]])
+                elif show_small_monsters:
+                    monster_name = small_monsters.get(name)
+                    if monster_name:
+                        small_monster_results.append([name, hp, initial_hp, result[1]])
     except (Exception,):
         pass
     return large_monster_results + small_monster_results
@@ -322,7 +324,12 @@ def get_base_address(process_name):
 
 def get_data(pid, base_address, only_large_monsters, workers=2):
     process_handle = pymem.process.open(pid)
-    pattern = "FF 00 00 00 00 00 00 00 00 00 00 00 00 ?? 00 03 E8"
+    # pointer - 0x131 = HP
+    # pattern = "FF ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 00 03 E8"
+    # pointer + 0x12 = HP
+    # pattern = "FF ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? ?? 00 00 ?? ?? 00 00 ?? ?? 3F 80 00 00 00 00"
+    # pointer + 0x8A = HP
+    pattern = "3C F5 C2 8F 00 00 00 00 00 00 00 00 00 00 00 00"
     scan_size = 0x3B00000  # 0x3B00000  # 0x9BBF000 or 7BBF000
     if process_handle:
         return scan_aob_batched(
