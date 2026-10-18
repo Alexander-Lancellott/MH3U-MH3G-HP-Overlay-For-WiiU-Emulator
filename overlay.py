@@ -305,6 +305,7 @@ class Overlay(QWidget):
                         text += f" {hp}"
                         if self.show_initial_hp:
                             text += f" | {initial_hp}"
+                        text += f" | {'→ ' if monster[6] else ''}Area {monster[5]}"
                         label.setText(text)
                         label_layout.addWidget(label)
                     if ConfigOverlay.show_small_monsters:

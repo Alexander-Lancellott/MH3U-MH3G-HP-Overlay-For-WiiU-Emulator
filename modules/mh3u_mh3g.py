@@ -264,6 +264,56 @@ def read_float(process_handle, address, length=4):
     return unpack('>f', pymem.memory.read_bytes(process_handle, address, length))[0]
 
 
+# Monster area ids are the game's internal ones; per location (stage) they map to the in-game map labels.
+HUNTER_PTR = 0x10547BF0      # guest address of the pointer to the hunter object
+HUNTER_CLASS = 0x1007F1A0    # vtable of that object
+LOCATION_OFFSET = 0xE95      # u8 location id inside the hunter object
+AREA_LABELS = {
+    3: {1: 1, 2: 3, 3: 4, 4: 5, 5: 2, 6: 8, 7: 7, 8: 6, 9: 9, 10: 10},  # Flooded Forest
+    4: {1: 1, 2: 3, 3: 2, 4: 5, 5: 7, 6: 4, 7: 6},  # Tundra
+    5: {1: 2, 2: 1, 3: 3, 4: 5, 5: 6, 6: 4, 7: 7, 8: 8, 9: 10, 10: 9},  # Volcano
+    12: {},  # Misty Peaks: ids already match the map
+    15: {1: 1, 2: 3, 3: 2, 4: 7, 5: 5, 6: 9, 7: 11, 8: 12, 9: 6, 10: 8, 11: 4, 12: 10},  # Deserted Island
+    16: {1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 8, 7: 9, 8: 10, 9: 7, 10: 11, 11: 6},  # Sandy Plains
+}
+
+
+def find_hunter_in_chunk(memory_chunk, chunk_address):
+    # fallback when the static pointer is empty: the hunter object class only appears once
+    needle = HUNTER_CLASS.to_bytes(4, 'big')
+    i = memory_chunk.find(needle)
+    while i != -1:
+        if i % 4 == 0:
+            return chunk_address + i
+        i = memory_chunk.find(needle, i + 1)
+    return None
+
+
+def get_location(process_handle, base_address, fallback_obj=None):
+    # base_address is the emulated region + 0x2CF00000; guest 0x02000000 is the region start
+    emu_base = base_address - 0x2CF00000
+    obj = None
+    try:
+        ptr = read_int(process_handle, emu_base + HUNTER_PTR - 0x02000000, 4, little=False)
+        if ptr and read_int(process_handle, emu_base + ptr - 0x02000000, 4, little=False) == HUNTER_CLASS:
+            obj = emu_base + ptr - 0x02000000
+    except (Exception,):
+        pass
+    obj = obj or fallback_obj
+    if obj:
+        try:
+            return read_int(process_handle, obj + LOCATION_OFFSET, 1)
+        except (Exception,):
+            pass
+    return None
+
+
+def area_label(location, area):
+    if location in AREA_LABELS:
+        return str(AREA_LABELS[location].get(area, area))
+    return f"{area}?"  # unmapped location: raw game id
+
+
 def scan_aob_batched(
         process_handle,
         base_address,
@@ -285,11 +335,14 @@ def scan_aob_batched(
         small_monsters = Monsters.small_monsters if show_small_monsters else {}
 
         results = []
+        hunter_obj = None
         with ThreadPoolExecutor(max_workers) as executor:
             futures = []
             for i in range(num_chunks):
                 chunk_offset = i * chunk_size
                 memory_chunk = pymem.memory.read_bytes(process_handle, base_address + chunk_offset, chunk_size)
+                if hunter_obj is None:
+                    hunter_obj = find_hunter_in_chunk(memory_chunk, base_address + chunk_offset)
                 futures.append(
                     executor.submit(scanmodule.scan_chunk, memory_chunk, pattern_np, mask, base_address, chunk_offset)
                 )
@@ -298,6 +351,7 @@ def scan_aob_batched(
                 results.extend(future.result())
 
         results.sort(key=lambda x: x[0])
+        location = get_location(process_handle, base_address, hunter_obj)
 
         for result in results:
             name = read_int(process_handle, result[0])
@@ -308,7 +362,10 @@ def scan_aob_batched(
             if is_visible:
                 if monster_name:
                     monster_size = int(round(read_float(process_handle, result[1] - 0x816) * 100, 2))
-                    large_monster_results.append([name, hp, initial_hp, monster_size, result[1]])
+                    # area switches to the destination as soon as the monster takes off
+                    area = area_label(location, read_int(process_handle, result[1] + 0x527, 1))
+                    is_flying = read_float(process_handle, result[1] - 0x876) > 800  # position y
+                    large_monster_results.append([name, hp, initial_hp, monster_size, result[1], area, is_flying])
                 elif show_small_monsters:
                     monster_name = small_monsters.get(name)
                     if monster_name:

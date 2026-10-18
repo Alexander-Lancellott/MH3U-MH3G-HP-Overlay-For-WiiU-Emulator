@@ -23,6 +23,12 @@ You can support me by donating! I’d really appreciate it. But either way, than
   <img height='45' style='border:0px;height:45px;' src='https://storage.ko-fi.com/cdn/kofi2.png?v=6' border='0' alt='Buy Me a Coffee at ko-fi.com' />
 </a>
 
+## Area tracking
+
+Each large monster's line ends with the area it is in, using the number shown on the in-game map, e.g. `Rathian 3500 | Area 5`. While a monster flies to another area, the line shows `→ Area N` with its destination. Monsters that walk between areas switch straight to the new number.
+
+Mapped locations: Deserted Island, Sandy Plains, Flooded Forest, Tundra, Volcano and Misty Peaks. Elsewhere the overlay shows the game's internal area number followed by `?`. Area tracking was tested on MH3U (USA) v32. See [RESEARCH.md](RESEARCH.md) for how it works.
+
 ## Compatibility
 
 I've only managed to make the overlay compatible with the latest update of MH3U and MH3G as unpatched versions usually do not work in Cemu. Below is a list of the versions where I tested and confirmed that the overlay works correctly:
